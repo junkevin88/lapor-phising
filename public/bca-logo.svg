@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img">
+  <title>Mark demo (bukan logo resmi PT BCA Tbk)</title>
+  <defs>
+    <linearGradient id="b" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00529B"/>
+      <stop offset="100%" stop-color="#003D79"/>
+    </linearGradient>
+  </defs>
+  <rect width="80" height="80" rx="18" fill="url(#b)"/>
+  <path d="M6 52c14-12 32-28 56-36v12C40 34 24 48 10 60z" fill="#F47920"/>
+  <text
+    x="40"
+    y="48"
+    text-anchor="middle"
+    fill="#ffffff"
+    font-family="Segoe UI, system-ui, Arial, sans-serif"
+    font-size="22"
+    font-weight="700"
+    letter-spacing="-0.03em"
+  >BCA</text>
+</svg>
