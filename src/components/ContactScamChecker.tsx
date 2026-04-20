@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  ArrowLeft,
   ChevronRight,
   Image as ImageIcon,
   Layers,
@@ -338,14 +340,22 @@ export default function ContactScamChecker() {
   return (
     <div className="min-h-full bg-[#F5F7F9] text-slate-800">
       <header className="bg-[#0a3a63] text-white shadow-md">
-        <div className="mx-auto flex max-w-3xl flex-col gap-1 px-4 py-5">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4">
+          <Link
+            href="/"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+            aria-label="Kembali ke Pusat Bantuan"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Link>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/95 shadow-sm ring-1 ring-white/40">
               {/* eslint-disable-next-line @next/next/no-img-element -- SVG statis di /public */}
               <img src="/bca-logo.svg" alt="" width={40} height={40} className="h-10 w-10 object-contain" />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">ContactGuard</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">Lapor phising</h1>
+              <p className="truncate text-xs text-sky-100/90">ContactGuard · demo</p>
             </div>
           </div>
         </div>

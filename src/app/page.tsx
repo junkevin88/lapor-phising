@@ -1,5 +1,5 @@
-import ContactScamChecker from "@/components/ContactScamChecker";
+import HelpHubLanding from "@/components/HelpHubLanding";
 
 export default function Home() {
-  return <ContactScamChecker />;
+  return <HelpHubLanding />;
 }

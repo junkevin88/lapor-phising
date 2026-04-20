@@ -54,7 +54,7 @@ src/
 1. **Model (gpt-4o-mini)** — Mengembalikan JSON: `verdict`, `confidence` (mentah), `signals[]` dengan `**weight` 1–10** per indikator, `reasoning_steps`, `recommended_action`, `analyzed_text_preview`.
 2. **Mesin skor (`scoring-engine.ts`)** — Menghitung **confidence akhir** dari kombinasi: confidence mentah model, **jumlah bobot** sinyal (dinormalisasi dengan konstanta dokumentasi), dan **kualitas teks** (panjang) atau **kualitas OCR** (panjang + confidence Tesseract bila ada). OCR sangat pendek / buruk memicu **penalti** (confidence dikalikan 0.88) dan narasi penjelasan.
 3. **Gambar** — UI menampilkan **pratinjau** + menjalankan **Tesseract** untuk panel OCR; payload ke API menyertakan `clientOcrText`, `clientOcrQuality`, `clientOcrMeanConfidence` bersama **vision** agar dosen bisa melihat dua jalur teks.
-4. **Suara** — `POST /api/transcribe` memakai **gpt-4o-mini-transcribe** dengan **`language=id`** + prompt bantu Indonesia (default), lalu `POST /api/analyze` dengan `source: "voice"`. Override: `OPENAI_TRANSCRIBE_MODEL`, `OPENAI_TRANSCRIBE_LANGUAGE`, `OPENAI_TRANSCRIBE_PROMPT`.
+4. **Suara** — `POST /api/transcribe` memakai **gpt-4o-mini-transcribe** dengan `**language=id`** + prompt bantu Indonesia (default), lalu `POST /api/analyze` dengan `source: "voice"`. Override: `OPENAI_TRANSCRIBE_MODEL`, `OPENAI_TRANSCRIBE_LANGUAGE`, `OPENAI_TRANSCRIBE_PROMPT`.
 5. **Tabel breakdown** — Di UI: baris per sinyal dengan **bobot** dan **kumulatif**, plus ringkasan formula di README kode (`computeExplainableScoring`).
 6. **Tiket simulasi** — Form dengan kategori, prioritas, ringkasan otomatis, catatan opsional; tidak ada database.
 
