@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Building2,
   CreditCard,
   Info,
   Landmark,
@@ -95,9 +94,9 @@ export default function HelpHubLanding() {
                 <ShieldAlert className="h-7 w-7" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-[#0072BC]">Lapor phising</p>
+                <p className="text-sm font-bold text-[#0072BC]">TANYA AI</p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Laporkan pesan mencurigakan, screenshot, atau rekaman suara untuk pemeriksaan cepat (demo).
+                  Periksa pesan mencurigakan lewat teks, gambar, atau unggah file untuk pemeriksaan cepat (demo).
                 </p>
                 <p className="mt-2 text-xs font-medium text-sky-700">Ketuk untuk membuka alat →</p>
               </div>

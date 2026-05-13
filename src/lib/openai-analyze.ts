@@ -1,42 +1,74 @@
-import OpenAI from "openai";
+import OpenAI, { APIConnectionError, APIConnectionTimeoutError } from "openai";
 import type { MatchedSignal, ModelAnalysisBeforeScoring, PhishingAnalysis, ReasoningStep, Verdict } from "./types";
+import { openAiCompatibleClientOptions } from "./llm-env";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
-const SYSTEM_PROMPT = `You are a fraud-awareness assistant for a banking help-center *demo* (not a real bank).
-Classify user-submitted content as phishing/scam risk for Indonesian and English messages (and text visible in screenshots).
+const SYSTEM_PROMPT = `You are a fraud-awareness assistant for a *demo* BCA help-center context (not a real bank system).
+The ONLY task is: judge whether the user content is relevant to **BCA-related scam/phishing assessment**, and if relevant, whether it looks like **phishing** or **not phishing**.
 
 Return a single JSON object ONLY (no markdown), with exactly these keys:
-- "verdict": one of "safe", "suspicious", "likely_phishing"
+- "verdict": exactly one of "irrelevant", "phishing", "not_phishing"
 - "confidence": number from 0 to 1 (your subjective estimate BEFORE any server-side math — server will blend this with weighted signals)
-- "confidence_rationale": short explanation (plain language)
-- "signals": array of objects. Each MUST have: "id" (snake_case), "label" (short), "weight" (integer 1-10 importance of this red flag), "detail" (one sentence). Use empty array if none. Higher weight = stronger scam indicator.
+- "confidence_rationale": short explanation (plain language, Indonesian preferred)
+- "signals": array of objects. Each MUST have: "id" (snake_case), "label" (short), "weight" (integer 1-10 importance of this indicator), "detail" (one sentence). Use empty array if none. For "irrelevant", signals should usually be empty or very low weight.
 - "reasoning_steps": array of 4 to 7 objects for an EDUCATIONAL "behind the scenes" trace. Each: "step" (int), "title" (short), "detail" (1-2 sentences). Do NOT claim raw neural internals.
-- "recommended_action": one short paragraph
+- "recommended_action": one short paragraph (Indonesian preferred)
 - "analyzed_text_preview": trimmed excerpt of message OR transcription from image (max ~800 chars)
 
-Verdict calibration:
-- "likely_phishing": strong credential-theft / fake bank / malicious link / suspension threats.
-- "suspicious": mixed or vague marketing, unclear sender, no explicit OTP/link threat.
-- "safe": routine reminders, official-style, low pressure.
+Verdict definitions:
+- "irrelevant": content is **outside the scope** of deciding BCA scam/phishing (e.g. homework, unrelated topics, other banks with no BCA angle, random chat, empty noise). NOT the same as "safe message" — it is "not applicable to this check".
+- "phishing": strong scam/phishing indicators in a **BCA-relevant** context (fake CS, credential theft, malicious links, fake suspension, impersonation of BCA, fake Halo BCA, etc.).
+- "not_phishing": content **is in scope** (mentions BCA / banking comms / plausible customer message) and does **not** show phishing patterns; routine reminders, neutral inquiries, legitimate-style notices without pressure to leak secrets.
 
 Rules:
 - Never ask the user for real OTP/PIN/passwords.
-- Prefer "suspicious" over "likely_phishing" when malicious links or OTP demands are NOT clearly present.`;
+- Prefer "not_phishing" over "phishing" when malicious links or OTP demands are NOT clearly present but the message is still BCA-related.
+- If the message is not about BCA / scam check context at all, choose "irrelevant" even if the text looks "safe".`;
 
 function verdictLabel(v: Verdict): string {
-  if (v === "likely_phishing") return "Likely Phishing";
-  if (v === "suspicious") return "Suspicious";
-  return "Safe";
+  if (v === "phishing") return "Phising";
+  if (v === "not_phishing") return "Bukan Phising";
+  return "Tidak Relevan";
 }
 
 function coerceVerdict(v: unknown): Verdict {
-  if (typeof v !== "string") return "suspicious";
+  if (typeof v !== "string") return "irrelevant";
   const x = v.toLowerCase().trim().replace(/[\s-]+/g, "_");
-  if (x === "likely_phishing" || x === "phishing" || x === "scam" || x === "fraud") return "likely_phishing";
-  if (x === "suspicious" || x === "spam" || x === "uncertain") return "suspicious";
-  if (x === "safe" || x === "legitimate" || x === "benign") return "safe";
-  return "suspicious";
+  if (
+    x === "phishing" ||
+    x === "likely_phishing" ||
+    x === "scam" ||
+    x === "fraud" ||
+    x === "phisising" ||
+    x === "phising"
+  ) {
+    return "phishing";
+  }
+  if (
+    x === "not_phishing" ||
+    x === "not_phising" ||
+    x === "safe" ||
+    x === "legitimate" ||
+    x === "benign" ||
+    x === "bukan_phishing" ||
+    x === "bukan_phising"
+  ) {
+    return "not_phishing";
+  }
+  if (
+    x === "irrelevant" ||
+    x === "out_of_scope" ||
+    x === "off_topic" ||
+    x === "unrelated" ||
+    x === "tidak_relevan" ||
+    x === "n_a" ||
+    x === "na"
+  ) {
+    return "irrelevant";
+  }
+  if (x === "suspicious" || x === "spam" || x === "uncertain") return "not_phishing";
+  return "irrelevant";
 }
 
 function clamp01(n: number) {
@@ -181,11 +213,12 @@ export type OpenAiAnalyzeParams = {
 
 export async function analyzeWithOpenAI(params: OpenAiAnalyzeParams): Promise<ModelAnalysisBeforeScoring> {
   const model = params.model?.trim() || DEFAULT_MODEL;
-  const client = new OpenAI({
-    apiKey: params.apiKey,
-    organization: params.organization,
-    project: params.project,
-  });
+  const client = new OpenAI(
+    openAiCompatibleClientOptions(params.apiKey, {
+      organization: params.organization,
+      project: params.project,
+    }),
+  );
 
   const ocrBlock =
     params.source === "image" && (params.clientOcrText || params.clientOcrQuality != null)
@@ -252,13 +285,36 @@ export async function analyzeWithOpenAI(params: OpenAiAnalyzeParams): Promise<Mo
   return normalizeAiPayload(parsed, params.source, ocrMeta);
 }
 
+function errorCauseMessage(err: unknown): string | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const c = (err as { cause?: unknown }).cause;
+  if (c instanceof Error && c.message.trim()) return c.message.trim();
+  if (typeof c === "string" && c.trim()) return c.trim();
+  return undefined;
+}
+
 export function mapOpenAIError(err: unknown): string {
+  if (err instanceof APIConnectionTimeoutError) {
+    const cause = errorCauseMessage(err);
+    return cause
+      ? `Sambungan ke layanan analisis habis waktu. Detail: ${cause}. Coba lagi beberapa saat lagi.`
+      : "Sambungan ke layanan analisis habis waktu. Coba lagi beberapa saat lagi.";
+  }
+  if (err instanceof APIConnectionError) {
+    const cause = errorCauseMessage(err);
+    const hostHint = process.env.OPENAI_BASE_URL?.trim()
+      ? "Pastikan OPENAI_BASE_URL bisa dijangkau dari server Next.js."
+      : "Atur OPENAI_BASE_URL ke penyedia kompatibel OpenAI (mis. Groq) jika api.openai.com diblokir.";
+    return cause
+      ? `Tidak bisa menjangkau layanan analisis dari server aplikasi ini. Detail: ${cause}. Cek internet, firewall, VPN, atau DNS. ${hostHint}`
+      : `Tidak bisa menjangkau layanan analisis dari server aplikasi ini. Cek jaringan server. ${hostHint}`;
+  }
   if (err && typeof err === "object" && "status" in err) {
     const status = (err as { status?: number }).status;
-    if (status === 401) return "OpenAI API key ditolak (401). Periksa OPENAI_API_KEY di .env.local.";
-    if (status === 429) return "Rate limit OpenAI (429). Coba lagi nanti.";
-    if (status === 400) return "Permintaan ditolak oleh OpenAI (400). Cek format gambar/teks.";
+    if (status === 401) return "Autentikasi ditolak (401). Pastikan kunci API untuk layanan analisis benar dan aktif.";
+    if (status === 429) return "Batas pemakaian layanan analisis tercapai (429). Coba lagi nanti.";
+    if (status === 400) return "Permintaan ditolak oleh layanan analisis (400). Cek format gambar atau teks.";
   }
   if (err instanceof Error) return err.message;
-  return "Gagal memanggil OpenAI.";
+  return "Gagal memanggil layanan analisis.";
 }

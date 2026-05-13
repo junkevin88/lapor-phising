@@ -11,7 +11,7 @@ import {
   Layers,
   Loader2,
   MessageSquareText,
-  Mic,
+  Upload,
   Shield,
   Ticket,
 } from "lucide-react";
@@ -21,9 +21,9 @@ import { extractTextFromImageClient } from "@/lib/ocr-client";
 import { nextHBCATicketId } from "@/lib/ticket";
 
 const MAX_IMAGE_FILE_BYTES = 4 * 1024 * 1024;
-const MAX_AUDIO_FILE_BYTES = 24 * 1024 * 1024;
+const MAX_UPLOAD_FILE_BYTES = 24 * 1024 * 1024;
 
-type Tab = "text" | "image" | "voice";
+type Tab = "text" | "image" | "upload";
 
 type OcrUiState = {
   loading: boolean;
@@ -33,13 +33,11 @@ type OcrUiState = {
   note?: string;
 };
 
-const SAMPLE_PHISHING = `Yth nasabah yang terhormat, tim keamanan Bank mendeteksi aktivitas mencurigakan.
-Segera verifikasi OTP dan PIN Anda di http://bit.ly/verify-secure-login agar akun tidak diblokir dalam 30 menit.
-Customer Service Bank`;
+const SAMPLE_PHISHING = `Yth nasabah BCA yang terhormat, tim keamanan mendeteksi aktivitas mencurigakan pada akun Anda.
+Segera verifikasi OTP dan PIN di http://bit.ly/bca-cepat-verify agar kartu tidak diblokir dalam 30 menit.
+Customer Service BCA`;
 
-const SAMPLE_AMBIGUOUS = `Halo, kami dari tim follow-up program kartu. Boleh minta waktu singkat untuk konfirmasi preferensi komunikasi Anda? Tidak perlu kirim data sensitif lewat chat ini.`;
-
-const SAMPLE_SAFE = `Reminder: tagihan kartu kredit jatuh tempo 22 Apr 2026. Pembayaran dapat dilakukan melalui aplikasi resmi atau ATM.`;
+const SAMPLE_NOT_PHISHING = `[INFO BCA] Transaksi debit Rp125.000 di TOKO SEJAHTERA berhasil. Rekening *5678 saldo Rp3.450.000. Jika bukan Anda, hubungi Halo BCA 1500888.`;
 
 function heuristicOcrQuality(text: string, meanConfidence: number): number {
   const len = text.trim().length;
@@ -65,42 +63,36 @@ async function fileToBase64(file: File): Promise<{ imageBase64: string; mimeType
 }
 
 function verdictStyles(verdict: PhishingAnalysis["verdict"]) {
-  if (verdict === "likely_phishing") {
+  if (verdict === "phishing") {
     return {
       ring: "ring-red-300",
-      badge: "bg-red-100 text-red-900 border border-red-300",
-      bar: "bg-red-600",
       cardBg: "bg-gradient-to-br from-red-50/95 via-white to-white",
       border: "border-red-200",
     };
   }
-  if (verdict === "suspicious") {
+  if (verdict === "irrelevant") {
     return {
-      ring: "ring-amber-300",
-      badge: "bg-amber-100 text-amber-950 border border-amber-300",
-      bar: "bg-amber-500",
-      cardBg: "bg-gradient-to-br from-amber-50/90 via-white to-white",
-      border: "border-amber-200",
+      ring: "ring-slate-300",
+      cardBg: "bg-gradient-to-br from-slate-50/95 via-white to-white",
+      border: "border-slate-200",
     };
   }
   return {
     ring: "ring-emerald-300",
-    badge: "bg-emerald-100 text-emerald-950 border border-emerald-300",
-    bar: "bg-emerald-600",
     cardBg: "bg-gradient-to-br from-emerald-50/90 via-white to-white",
     border: "border-emerald-200",
   };
 }
 
 function ticketCategory(v: PhishingAnalysis["verdict"]): string {
-  if (v === "likely_phishing") return "FRAUD — Likely phishing / scam";
-  if (v === "suspicious") return "FRAUD — Suspicious / needs review";
-  return "INFO — Low risk / safe-ish";
+  if (v === "phishing") return "FRAUD — Phising / penipuan";
+  if (v === "irrelevant") return "INFO — Di luar cakupan penilaian";
+  return "INFO — Bukan phising";
 }
 
 function ticketPriority(v: PhishingAnalysis["verdict"]): TicketPayload["priority"] {
-  if (v === "likely_phishing") return "HIGH";
-  if (v === "suspicious") return "MEDIUM";
+  if (v === "phishing") return "HIGH";
+  if (v === "irrelevant") return "LOW";
   return "LOW";
 }
 
@@ -114,8 +106,8 @@ export default function ContactScamChecker() {
   const [tab, setTab] = useState<Tab>("text");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadExtractedText, setUploadExtractedText] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [ocr, setOcr] = useState<OcrUiState>({
     loading: false,
@@ -130,16 +122,23 @@ export default function ContactScamChecker() {
   const [ticketNote, setTicketNote] = useState("");
   const [ticketBusy, setTicketBusy] = useState(false);
 
-  useEffect(() => {
-    if (!file) {
+  function setImageFile(next: File | null) {
+    setFile(next);
+    if (!next) {
       setPreviewUrl(null);
       setOcr({ loading: false, text: "", meanConfidence: 0, usedMock: false });
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!file) return;
     const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    setOcr({ loading: true, text: "", meanConfidence: 0, usedMock: false });
     let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setPreviewUrl(url);
+      setOcr({ loading: true, text: "", meanConfidence: 0, usedMock: false });
+    });
     void (async () => {
       try {
         const r = await extractTextFromImageClient(file);
@@ -170,12 +169,12 @@ export default function ContactScamChecker() {
 
   const needsEscalation = useMemo(() => {
     if (!result || ticketPayload) return false;
+    if (result.verdict === "irrelevant") return false;
     return result.confidence < ESCALATION_CONFIDENCE_THRESHOLD;
   }, [result, ticketPayload]);
 
   type AnalyzePayload =
     | { source: "text"; text: string }
-    | { source: "voice"; text: string }
     | {
         source: "image";
         imageBase64: string;
@@ -227,38 +226,40 @@ export default function ContactScamChecker() {
     await runAnalyze({ source: "text", text });
   }
 
-  async function onVoiceTranscribeAndAnalyze() {
-    if (!audioFile) {
-      setError("Pilih file audio dulu (mp3, wav, m4a, webm, …).");
+  async function onExtractUploadAndAnalyze() {
+    if (!uploadFile) {
+      setError("Pilih file dulu untuk diunggah.");
       return;
     }
-    if (audioFile.size > MAX_AUDIO_FILE_BYTES) {
-      setError(`Audio terlalu besar (maks ${MAX_AUDIO_FILE_BYTES / (1024 * 1024)} MB).`);
+    if (uploadFile.size > MAX_UPLOAD_FILE_BYTES) {
+      setError(`File terlalu besar (maks ${MAX_UPLOAD_FILE_BYTES / (1024 * 1024)} MB).`);
       return;
     }
+
     setLoading(true);
     setError(null);
     setTicketPayload(null);
     setTicketNote("");
-    setVoiceTranscript("");
+    setUploadExtractedText("");
+
     try {
       const fd = new FormData();
-      fd.append("file", audioFile);
-      const tr = await fetch("/api/transcribe", { method: "POST", body: fd });
-      if (!tr.ok) {
-        const j = await tr.json().catch(() => ({}));
-        throw new Error(typeof j.error === "string" ? j.error : `Transkrip gagal (${tr.status}).`);
+      fd.append("file", uploadFile);
+      const ex = await fetch("/api/extract", { method: "POST", body: fd });
+      if (!ex.ok) {
+        const j = await ex.json().catch(() => ({}));
+        throw new Error(typeof j.error === "string" ? j.error : `Gagal membaca file (${ex.status}).`);
       }
-      const raw = (await tr.json()) as { text?: string };
-      const transcript = typeof raw.text === "string" ? raw.text.trim() : "";
-      setVoiceTranscript(transcript);
-      if (!transcript) {
-        throw new Error("Transkrip kosong — coba file lain atau perjelas rekaman.");
+      const raw = (await ex.json()) as { text?: string };
+      const extracted = typeof raw.text === "string" ? raw.text.trim() : "";
+      setUploadExtractedText(extracted);
+      if (!extracted) {
+        throw new Error("Teks dari file kosong atau belum bisa dibaca. Coba file lain.");
       }
-      setResult(await executeAnalyze({ source: "voice", text: transcript }));
+      setResult(await executeAnalyze({ source: "text", text: extracted }));
     } catch (e) {
       setResult(null);
-      setError(e instanceof Error ? e.message : "Gagal transkrip atau analisis.");
+      setError(e instanceof Error ? e.message : "Gagal memproses file.");
     } finally {
       setLoading(false);
     }
@@ -307,10 +308,10 @@ export default function ContactScamChecker() {
   function applySample(value: string) {
     setTab("text");
     setText(value);
-    setFile(null);
+    setImageFile(null);
     setPreviewUrl(null);
-    setAudioFile(null);
-    setVoiceTranscript("");
+    setUploadFile(null);
+    setUploadExtractedText("");
     setError(null);
     setResult(null);
     setTicketPayload(null);
@@ -354,8 +355,8 @@ export default function ContactScamChecker() {
               <img src="/bca-logo.svg" alt="" width={40} height={40} className="h-10 w-10 object-contain" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight">Lapor phising</h1>
-              <p className="truncate text-xs text-sky-100/90">ContactGuard · demo</p>
+              <h1 className="text-xl font-semibold tracking-tight">TANYA AI</h1>
+              <p className="truncate text-xs text-sky-100/90">Threat Analysis for Your Awareness</p>
             </div>
           </div>
         </div>
@@ -396,15 +397,15 @@ export default function ContactScamChecker() {
                 <button
                   type="button"
                   className={`flex items-center gap-2 rounded-full px-4 py-2 transition ${
-                    tab === "voice" ? "bg-white text-[#0a3a63] shadow-sm" : "hover:text-slate-800"
+                    tab === "upload" ? "bg-white text-[#0a3a63] shadow-sm" : "hover:text-slate-800"
                   }`}
                   onClick={() => {
-                    setTab("voice");
+                    setTab("upload");
                     setError(null);
                   }}
                 >
-                  <Mic className="h-4 w-4" />
-                  Suara
+                  <Upload className="h-4 w-4" />
+                  Upload
                 </button>
               </div>
             </div>
@@ -436,7 +437,7 @@ export default function ContactScamChecker() {
                   accept="image/*"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    setFile(f ?? null);
+                    setImageFile(f ?? null);
                     setError(null);
                     setResult(null);
                     setTicketPayload(null);
@@ -483,46 +484,44 @@ export default function ContactScamChecker() {
               </div>
             )}
 
-            {tab === "voice" && (
+            {tab === "upload" && (
               <div className="flex flex-col gap-3">
-                <label htmlFor="aud" className="text-sm font-medium text-slate-700">
-                  File rekaman
+                <label htmlFor="upl" className="text-sm font-medium text-slate-700">
+                  Upload file
                 </label>
                 <input
-                  id="aud"
+                  id="upl"
                   type="file"
-                  accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg,.flac,.opus"
+                  accept=".pdf,.doc,.docx,.apk,.txt,.md,.json,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    setAudioFile(f ?? null);
-                    setVoiceTranscript("");
+                    setUploadFile(f ?? null);
+                    setUploadExtractedText("");
                     setError(null);
                     setResult(null);
                     setTicketPayload(null);
                   }}
                   className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-sky-700"
                 />
-                {audioFile && (
+                {uploadFile && (
                   <p className="text-xs text-slate-600">
-                    Dipilih: <span className="font-medium">{audioFile.name}</span> ·{" "}
-                    {(audioFile.size / (1024 * 1024)).toFixed(2)} MB
+                    Dipilih: <span className="font-medium">{uploadFile.name}</span> ·{" "}
+                    {(uploadFile.size / (1024 * 1024)).toFixed(2)} MB
                   </p>
                 )}
-                {voiceTranscript && (
+                {uploadExtractedText && (
                   <details className="rounded-xl border border-slate-200 bg-slate-50" open>
                     <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-800">
-                      Transkrip (gpt-4o-mini-transcribe)
+                      Preview teks dari file
                     </summary>
                     <pre className="max-h-40 overflow-auto whitespace-pre-wrap border-t border-slate-200 px-3 py-2 font-mono text-xs text-slate-800">
-                      {voiceTranscript}
+                      {uploadExtractedText}
                     </pre>
                   </details>
                 )}
                 <p className="text-xs text-slate-500">
-                  Transkrip memakai bahasa <strong>Indonesia (id)</strong> secara default agar tidak melenceng ke bahasa
-                  lain — atur <code className="rounded bg-slate-100 px-1">OPENAI_TRANSCRIBE_LANGUAGE</code> /{" "}
-                  <code className="rounded bg-slate-100 px-1">OPENAI_TRANSCRIBE_PROMPT</code> di{" "}
-                  <code className="rounded bg-slate-100 px-1">.env.local</code> bila perlu.
+                  File akan dibaca untuk mengambil teksnya, lalu dianalisis seperti tab Teks. Beberapa format (mis.
+                  aplikasi) mungkin tidak bisa diekstrak penuh.
                 </p>
               </div>
             )}
@@ -532,12 +531,12 @@ export default function ContactScamChecker() {
                 type="button"
                 disabled={loading}
                 onClick={
-                  tab === "text" ? onAnalyzeText : tab === "image" ? onAnalyzeImage : onVoiceTranscribeAndAnalyze
+                  tab === "text" ? onAnalyzeText : tab === "image" ? onAnalyzeImage : onExtractUploadAndAnalyze
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0072BC] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00619e] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                {tab === "voice" ? "Transkrip & analisis" : "Analisis"}
+                {tab === "upload" ? "Baca & analisis" : "Analisis"}
               </button>
               <span className="text-xs text-slate-500 sm:self-center">Sample cepat:</span>
               <div className="flex flex-wrap gap-2">
@@ -546,21 +545,14 @@ export default function ContactScamChecker() {
                   className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-100"
                   onClick={() => applySample(SAMPLE_PHISHING)}
                 >
-                  Phishing
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100"
-                  onClick={() => applySample(SAMPLE_AMBIGUOUS)}
-                >
-                  Ambigu
+                  Phising
                 </button>
                 <button
                   type="button"
                   className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
-                  onClick={() => applySample(SAMPLE_SAFE)}
+                  onClick={() => applySample(SAMPLE_NOT_PHISHING)}
                 >
-                  Aman
+                  Bukan phising
                 </button>
               </div>
             </div>
@@ -570,8 +562,8 @@ export default function ContactScamChecker() {
                 <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
                 {tab === "image"
                   ? "Mengirim gambar + konteks OCR ke server…"
-                  : tab === "voice"
-                    ? "Mentranskrip audio lalu menganalisis…"
+                  : tab === "upload"
+                    ? "Membaca file lalu menganalisis…"
                     : "Mengirim teks ke model & mesin skor…"}
               </p>
             )}
@@ -595,9 +587,8 @@ export default function ContactScamChecker() {
           <section className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-10 text-center text-sm text-slate-600">
             <p className="font-medium text-slate-700">Belum ada laporan</p>
             <p className="mt-2 max-w-md mx-auto">
-              Pilih tab <strong>Teks</strong>, <strong>Gambar</strong>, atau <strong>Suara</strong>, lalu jalankan analisis.
-              Pastikan <code className="rounded bg-slate-100 px-1">OPENAI_API_KEY</code> ada di{" "}
-              <code className="rounded bg-slate-100 px-1">.env.local</code>.
+              Pilih tab <strong>Teks</strong>, <strong>Gambar</strong>, atau <strong>Upload</strong>, lalu jalankan analisis.
+              Kamu bisa mulai dari sample cepat di bawah tombol.
             </p>
           </section>
         )}
@@ -606,96 +597,10 @@ export default function ContactScamChecker() {
           <section
             className={`rounded-2xl border-2 p-5 shadow-md ring-2 ${styles.border} ${styles.ring} ${styles.cardBg}`}
           >
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Verdict</p>
-                  <p className="text-2xl font-bold text-[#0a3a63]">{result.verdictLabel}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {result.source === "voice" && (
-                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900 ring-1 ring-violet-200">
-                      Sumber: suara
-                    </span>
-                  )}
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${styles.badge}`}>
-                    Confidence akhir {(result.confidence * 100).toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-600">
-                <span className="font-medium text-slate-700">Confidence model (mentah):</span>{" "}
-                {(result.scoring.modelConfidenceRaw * 100).toFixed(0)}% →{" "}
-                <span className="font-medium text-slate-700">setelah mesin skor:</span>{" "}
-                {(result.scoring.computedConfidence * 100).toFixed(0)}%
-              </div>
-
-              <div>
-                <div className="mb-1 flex justify-between text-xs text-slate-600">
-                  <span>Meter confidence (untuk tiket manual)</span>
-                  <span>Ambang {ESCALATION_CONFIDENCE_THRESHOLD * 100}%</span>
-                </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80">
-                  <div
-                    className={`h-full rounded-full transition-all ${styles.bar}`}
-                    style={{ width: `${Math.min(100, result.confidence * 100)}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-slate-600">{result.confidenceRationale}</p>
-              </div>
-
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white/90">
-                <p className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-[#0a3a63]">
-                  Breakdown skor — indikator & bobot
-                </p>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[280px] text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="px-3 py-2 font-medium">Indikator</th>
-                        <th className="px-3 py-2 font-medium">Bobot</th>
-                        <th className="px-3 py-2 font-medium">Kumulatif</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.scoring.rows.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-3 py-4 text-slate-500">
-                            Tidak ada sinyal terbobot — total bobot 0.
-                          </td>
-                        </tr>
-                      ) : (
-                        result.scoring.rows.map((row) => (
-                          <tr key={row.id} className="border-b border-slate-100 last:border-0">
-                            <td className="px-3 py-2 align-top text-slate-800">
-                              <span className="font-medium">{row.label}</span>
-                              <p className="mt-0.5 text-slate-500">{row.detail}</p>
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 font-mono text-slate-700">{row.weight}</td>
-                            <td className="whitespace-nowrap px-3 py-2 font-mono text-slate-700">
-                              {row.cumulativeWeight}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="space-y-1 border-t border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
-                  <p>
-                    <strong>Total bobot:</strong> {result.scoring.totalWeight} · <strong>Rasio / ref:</strong>{" "}
-                    {(result.scoring.weightRatio * 100).toFixed(0)}% (÷ {result.scoring.maxWeightReference})
-                  </p>
-                  <p>
-                    <strong>Kualitas teks/OCR:</strong> {(result.scoring.textQuality * 100).toFixed(0)}% —{" "}
-                    {result.scoring.textQualityExplanation}
-                  </p>
-                  {result.scoring.ocrPenaltyApplied && (
-                    <p className="font-medium text-amber-800">Penalti OCR / teks pendek diterapkan (×0.88).</p>
-                  )}
-                  <p className="text-slate-500">{result.scoring.formulaNote}</p>
-                </div>
+            <div className="flex flex-col gap-5">
+              <div className="border-b border-slate-200/80 pb-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Hasil</p>
+                <p className="text-2xl font-bold text-[#0a3a63]">{result.verdictLabel}</p>
               </div>
 
               <details
@@ -743,8 +648,7 @@ export default function ContactScamChecker() {
                         className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2 text-sm text-slate-800"
                       >
                         <span className="font-semibold text-slate-900">{s.label}</span>
-                        <span className="text-slate-500"> · bobot {s.weight}</span>
-                        <p className="text-xs text-slate-600">{s.detail}</p>
+                        <p className="mt-0.5 text-xs text-slate-600">{s.detail}</p>
                       </li>
                     ))}
                   </ul>
@@ -758,7 +662,7 @@ export default function ContactScamChecker() {
 
               {result.source === "image" && (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Transkrip vision (preview)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cuplikan teks</p>
                   <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900/95 p-3 text-xs text-slate-100">
                     {result.analyzedTextPreview || "(kosong)"}
                   </pre>
@@ -766,11 +670,9 @@ export default function ContactScamChecker() {
                 </div>
               )}
 
-              {(result.source === "text" || result.source === "voice") && result.analyzedTextPreview && (
+              {result.source === "text" && result.analyzedTextPreview && (
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    {result.source === "voice" ? "Cuplikan transkrip" : "Cuplikan teks"}
-                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cuplikan teks</p>
                   <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-white/90 p-3 text-xs text-slate-700 ring-1 ring-slate-200">
                     {result.analyzedTextPreview}
                   </pre>
@@ -788,8 +690,7 @@ export default function ContactScamChecker() {
                 <h3 className="text-base font-semibold">Review manual disarankan</h3>
               </div>
               <p className="text-sm text-amber-950/90">
-                Confidence akhir di bawah {(ESCALATION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}%. Isi form ringkas
-                (simulasi) lalu buat tiket.
+                Untuk kasus ini, tinjauan manual disarankan. Isi form ringkas (simulasi) lalu buat tiket bila perlu.
               </p>
               <div className="grid gap-3 rounded-xl border border-amber-200/80 bg-white/90 p-4 text-sm">
                 <div>

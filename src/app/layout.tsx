@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ContactGuard — anti-scam message check",
-  description: "Heuristic phishing / spam check demo for a banking contact-service flow.",
+  title: "TANYA AI — Threat Analysis for Your Awareness",
+  description:
+    "Cek pesan mencurigakan (teks, gambar, atau unggah file) untuk edukasi kesadaran ancaman siber.",
   icons: {
     icon: "/bca-logo.svg",
     apple: "/bca-logo.svg",
@@ -27,8 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full font-sans">{children}</body>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <body suppressHydrationWarning className="min-h-full font-sans">
+        {children}
+      </body>
     </html>
   );
 }

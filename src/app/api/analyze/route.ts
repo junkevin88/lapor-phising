@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveLlmApiKey } from "@/lib/llm-env";
 import { analyzeWithOpenAI, mapOpenAIError } from "@/lib/openai-analyze";
 import { applyScoringToAnalysis } from "@/lib/scoring-engine";
 
@@ -20,12 +21,11 @@ type Body = {
 };
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = resolveLlmApiKey();
   if (!apiKey) {
     return NextResponse.json(
       {
-        error:
-          "OPENAI_API_KEY belum diset. Buat file .env.local di root project dan isi OPENAI_API_KEY=sk-... (lihat .env.example).",
+        error: "Layanan analisis belum siap. Coba lagi nanti atau hubungi admin.",
       },
       { status: 503 },
     );

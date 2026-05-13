@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI, { toFile } from "openai";
+import { openAiCompatibleClientOptions, resolveLlmApiKey } from "@/lib/llm-env";
 import { mapOpenAIError } from "@/lib/openai-analyze";
 
 export const runtime = "nodejs";
@@ -15,10 +16,10 @@ function isLikelyAudio(mime: string, name: string): boolean {
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = resolveLlmApiKey();
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY belum diset (lihat .env.example)." },
+      { error: "Layanan transkrip belum siap. Coba lagi nanti atau hubungi admin." },
       { status: 503 },
     );
   }
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     const buf = Buffer.from(await entry.arrayBuffer());
     const uploadable = await toFile(buf, entry.name || "audio.webm", { type: mime });
 
-    const client = new OpenAI({ apiKey });
+    const client = new OpenAI(openAiCompatibleClientOptions(apiKey));
     const transcription = await client.audio.transcriptions.create({
       file: uploadable,
       model,

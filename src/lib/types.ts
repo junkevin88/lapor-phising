@@ -1,4 +1,5 @@
-export type Verdict = "safe" | "suspicious" | "likely_phishing";
+/** Phising / bukan phising / di luar cakupan (bukan konteks penilaian BCA & scam). */
+export type Verdict = "irrelevant" | "phishing" | "not_phishing";
 
 export type MatchedSignal = {
   id: string;

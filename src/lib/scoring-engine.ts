@@ -84,18 +84,18 @@ export function computeExplainableScoring(
   let computed: number;
   let formulaNote: string;
 
-  if (verdict === "likely_phishing") {
+  if (verdict === "phishing") {
     computed = 0.52 * m + 0.28 * weightRatio + 0.2 * q;
     formulaNote =
-      "likely_phishing: 0.52×confidence_model + 0.28×(totalBobot/42) + 0.20×kualitas_teks — bukti bobot tinggi menaikkan keyakinan laporan.";
-  } else if (verdict === "suspicious") {
-    computed = 0.55 * m + 0.22 * weightRatio + 0.23 * q;
-    formulaNote =
-      "suspicious: 0.55×confidence_model + 0.22×(totalBobot/42) + 0.23×kualitas_teks — zona abu-abu, kualitas teks membantu keyakinan.";
-  } else {
+      "phishing: 0.52×confidence_model + 0.28×(totalBobot/42) + 0.20×kualitas_teks — bukti bobot tinggi menaikkan keyakinan laporan.";
+  } else if (verdict === "not_phishing") {
     computed = 0.48 * m + 0.17 * (1 - weightRatio) + 0.35 * q;
     formulaNote =
-      "safe: 0.48×confidence_model + 0.17×(1−totalBobot/42) + 0.35×kualitas_teks — sedikit bobot + teks jelas → lebih percaya diri “aman”.";
+      "not_phishing: 0.48×confidence_model + 0.17×(1−totalBobot/42) + 0.35×kualitas_teks — sedikit bobot + teks jelas → lebih percaya diri “bukan phising”.";
+  } else {
+    computed = 0.42 * m + 0.12 * weightRatio + 0.46 * q;
+    formulaNote =
+      "irrelevant: 0.42×confidence_model + 0.12×(totalBobot/42) + 0.46×kualitas_teks — di luar cakupan; bobot sinyal scam biasanya rendah.";
   }
 
   if (ocrPenaltyApplied) {
