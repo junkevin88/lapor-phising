@@ -1,5 +1,5 @@
 import ContactScamChecker from "@/components/ContactScamChecker";
 
-export default function LaporPage() {
+export default function PhishingCheckPage() {
   return <ContactScamChecker />;
 }

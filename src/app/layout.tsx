@@ -17,8 +17,8 @@ export const metadata: Metadata = {
   description:
     "Cek pesan mencurigakan (teks, gambar, atau file) untuk edukasi kesadaran ancaman siber.",
   icons: {
-    icon: "/bca-logo.svg",
-    apple: "/bca-logo.svg",
+    icon: "/tanya-ai-logo.png",
+    apple: "/tanya-ai-logo.png",
   },
 };
 

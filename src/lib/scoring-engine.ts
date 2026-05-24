@@ -91,7 +91,7 @@ export function computeExplainableScoring(
   } else if (verdict === "not_phishing") {
     computed = 0.48 * m + 0.17 * (1 - weightRatio) + 0.35 * q;
     formulaNote =
-      "not_phishing: 0.48×confidence_model + 0.17×(1−totalBobot/42) + 0.35×kualitas_teks — sedikit bobot + teks jelas → lebih percaya diri “bukan phising”.";
+      "not_phishing: 0.48×confidence_model + 0.17×(1−totalBobot/42) + 0.35×kualitas_teks — sedikit bobot + teks jelas → lebih percaya diri “bukan phishing”.";
   } else {
     computed = 0.42 * m + 0.12 * weightRatio + 0.46 * q;
     formulaNote =

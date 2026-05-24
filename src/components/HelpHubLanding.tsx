@@ -87,7 +87,7 @@ export default function HelpHubLanding() {
           <section className="mb-8">
             <h2 className="mb-3 text-base font-bold text-[#0a3a63]">Layanan digital</h2>
             <Link
-              href="/lapor"
+              href="/phishing"
               className="flex gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:border-sky-200 hover:shadow-md active:scale-[0.99]"
             >
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-inner">

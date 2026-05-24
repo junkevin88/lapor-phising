@@ -1,4 +1,4 @@
-/** Phising / bukan phising / di luar cakupan (bukan konteks penilaian BCA & scam). */
+/** Phishing / bukan phishing / di luar cakupan (bukan konteks penilaian BCA & scam). */
 export type Verdict = "irrelevant" | "phishing" | "not_phishing";
 
 export type MatchedSignal = {

@@ -85,9 +85,9 @@ function verdictStyles(verdict: PhishingAnalysis["verdict"]) {
 }
 
 function ticketCategory(v: PhishingAnalysis["verdict"]): string {
-  if (v === "phishing") return "FRAUD — Phising / penipuan";
+  if (v === "phishing") return "FRAUD — Phishing / penipuan";
   if (v === "irrelevant") return "INFO — Di luar cakupan penilaian";
-  return "INFO — Bukan phising";
+  return "INFO — Bukan phishing";
 }
 
 function ticketPriority(v: PhishingAnalysis["verdict"]): TicketPayload["priority"] {
@@ -360,8 +360,14 @@ export default function ContactScamChecker() {
           </Link>
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/95 shadow-sm ring-1 ring-white/40">
-              {/* eslint-disable-next-line @next/next/no-img-element -- SVG statis di /public */}
-              <img src="/bca-logo.svg" alt="" width={40} height={40} className="h-10 w-10 object-contain" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- logo statis di /public */}
+              <img
+                src="/tanya-ai-logo.png"
+                alt="TANYA AI"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
+              />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight">TANYA AI</h1>
@@ -550,14 +556,14 @@ export default function ContactScamChecker() {
                   className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-100"
                   onClick={() => applySample(SAMPLE_PHISHING)}
                 >
-                  Phising
+                  Phishing
                 </button>
                 <button
                   type="button"
                   className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
                   onClick={() => applySample(SAMPLE_NOT_PHISHING)}
                 >
-                  Bukan phising
+                  Bukan phishing
                 </button>
               </div>
             </div>

@@ -28,8 +28,8 @@ Rules:
 - For **Android app checks** (input describes an APK by filename / app name only): judge impersonation of BCA or banks from the **app name**; do not claim you scanned APK bytecode.`;
 
 function verdictLabel(v: Verdict): string {
-  if (v === "phishing") return "Phising";
-  if (v === "not_phishing") return "Bukan Phising";
+  if (v === "phishing") return "Phishing";
+  if (v === "not_phishing") return "Bukan Phishing";
   return "Tidak Relevan";
 }
 

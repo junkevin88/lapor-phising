@@ -49,12 +49,12 @@ export function isApkFileName(fileName: string, mime?: string): boolean {
   return /\.apk$/i.test(fileName) || m === "application/vnd.android.package-archive";
 }
 
-/** Teks untuk model: analisis phising dari nama aplikasi saja. */
+/** Teks untuk model: analisis phishing dari nama aplikasi saja. */
 export function buildAppFilenameAnalysisText(fileName: string, appName: string): string {
   return `[Pemeriksaan aplikasi Android — hanya berdasarkan nama file / nama aplikasi, bukan isi APK]
 
 File: ${fileName}
 Nama aplikasi (diturunkan dari nama file): ${appName}
 
-Tugas: nilai apakah aplikasi ini berpotensi phising atau penipuan yang meniru BCA, Halo BCA, myBCA, atau layanan perbankan resmi di Indonesia. Pertimbangkan ejaan mirip, kata "BCA", "bank", "verifikasi", "CS", "klaim hadiah", dll. Jika nama aplikasi tidak terkait perbankan/BCA sama sekali, gunakan verdict "irrelevant".`;
+Tugas: nilai apakah aplikasi ini berpotensi phishing atau penipuan yang meniru BCA, Halo BCA, myBCA, atau layanan perbankan resmi di Indonesia. Pertimbangkan ejaan mirip, kata "BCA", "bank", "verifikasi", "CS", "klaim hadiah", dll. Jika nama aplikasi tidak terkait perbankan/BCA sama sekali, gunakan verdict "irrelevant".`;
 }

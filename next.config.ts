@@ -7,6 +7,9 @@ const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   turbopack: { root: turbopackRoot },
+  async redirects() {
+    return [{ source: "/lapor", destination: "/phishing", permanent: true }];
+  },
 };
 
 export default nextConfig;
