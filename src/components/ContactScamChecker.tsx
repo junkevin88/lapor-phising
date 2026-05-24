@@ -18,6 +18,7 @@ import {
 import type { PhishingAnalysis, TicketPayload } from "@/lib/types";
 import { ESCALATION_CONFIDENCE_THRESHOLD } from "@/lib/types";
 import { extractTextFromImageClient } from "@/lib/ocr-client";
+import { buildFileInputAccept } from "@/lib/app-filename";
 import { nextHBCATicketId } from "@/lib/ticket";
 
 const MAX_IMAGE_FILE_BYTES = 4 * 1024 * 1024;
@@ -265,7 +266,7 @@ export default function ContactScamChecker() {
           : extracted;
       setUploadExtractedText(preview);
       if (!extracted) {
-        throw new Error("File tidak bisa dibaca. Coba format lain.");
+        throw new Error("Ekstensi file tidak dikenali.");
       }
       setResult(await executeAnalyze({ source: "text", text: extracted }));
     } catch (e) {
@@ -509,7 +510,7 @@ export default function ContactScamChecker() {
                 <input
                   id="upl"
                   type="file"
-                  accept=".pdf,.doc,.docx,.apk,.txt,.md,.json,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.android.package-archive,text/plain"
+                  accept={buildFileInputAccept()}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     setUploadFile(f ?? null);

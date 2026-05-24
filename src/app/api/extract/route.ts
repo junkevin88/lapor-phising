@@ -3,7 +3,8 @@ import mammoth from "mammoth";
 import {
   appDisplayNameFromFilename,
   buildAppFilenameAnalysisText,
-  isApkFileName,
+  fileExtension,
+  isAppInstallFileName,
 } from "@/lib/app-filename";
 /** Entry `pdf-parse` menjalankan skrip debug saat `module.parent` kosong — pakai lib agar aman di bundle. */
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
@@ -11,11 +12,6 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 export const runtime = "nodejs";
 
 const MAX_FILE_BYTES = 24 * 1024 * 1024;
-
-function extOf(name: string): string {
-  const idx = name.lastIndexOf(".");
-  return idx >= 0 ? name.slice(idx + 1).toLowerCase() : "";
-}
 
 function isTextLike(ext: string, mime: string): boolean {
   if (mime.startsWith("text/")) return true;
@@ -44,10 +40,21 @@ export async function POST(req: Request) {
 
   const name = entry.name || "upload";
   const mime = (entry.type || "application/octet-stream").toLowerCase();
-  const ext = extOf(name);
+  const ext = fileExtension(name);
 
   try {
     const buf = Buffer.from(await entry.arrayBuffer());
+
+    if (isAppInstallFileName(name, mime)) {
+      const appName = appDisplayNameFromFilename(name);
+      const text = buildAppFilenameAnalysisText(name, appName);
+      return NextResponse.json({
+        kind: "app",
+        fileName: name,
+        appName,
+        text,
+      });
+    }
 
     if (ext === "pdf" || mime === "application/pdf") {
       const r = await pdfParse(buf);
@@ -66,23 +73,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ text });
     }
 
-    if (isApkFileName(name, mime)) {
-      const appName = appDisplayNameFromFilename(name);
-      const text = buildAppFilenameAnalysisText(name, appName);
-      return NextResponse.json({
-        kind: "app",
-        fileName: name,
-        appName,
-        text,
-      });
-    }
-
-    return NextResponse.json(
-      { error: "Format file belum didukung. Coba PDF, DOCX, atau TXT." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Ekstensi file tidak dikenali." }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Gagal membaca isi file." }, { status: 400 });
   }
 }
-
