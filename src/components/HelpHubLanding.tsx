@@ -96,7 +96,7 @@ export default function HelpHubLanding() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-[#0072BC]">TANYA AI</p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                  Periksa pesan mencurigakan lewat teks, gambar, atau unggah file untuk pemeriksaan cepat (demo).
+                  Periksa pesan mencurigakan lewat teks, gambar, atau file untuk pemeriksaan cepat (demo).
                 </p>
                 <p className="mt-2 text-xs font-medium text-sky-700">Ketuk untuk membuka alat →</p>
               </div>

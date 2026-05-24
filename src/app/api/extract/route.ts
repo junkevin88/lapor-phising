@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
+import {
+  appDisplayNameFromFilename,
+  buildAppFilenameAnalysisText,
+  isApkFileName,
+} from "@/lib/app-filename";
 /** Entry `pdf-parse` menjalankan skrip debug saat `module.parent` kosong — pakai lib agar aman di bundle. */
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
@@ -61,11 +66,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ text });
     }
 
-    if (ext === "apk" || mime === "application/vnd.android.package-archive") {
-      return NextResponse.json(
-        { error: "File aplikasi (APK) belum didukung untuk dibaca teksnya. Coba unggah PDF/DOCX/TXT." },
-        { status: 400 },
-      );
+    if (isApkFileName(name, mime)) {
+      const appName = appDisplayNameFromFilename(name);
+      const text = buildAppFilenameAnalysisText(name, appName);
+      return NextResponse.json({
+        kind: "app",
+        fileName: name,
+        appName,
+        text,
+      });
     }
 
     return NextResponse.json(

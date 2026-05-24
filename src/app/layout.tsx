@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TANYA AI — Threat Analysis for Your Awareness",
   description:
-    "Cek pesan mencurigakan (teks, gambar, atau unggah file) untuk edukasi kesadaran ancaman siber.",
+    "Cek pesan mencurigakan (teks, gambar, atau file) untuk edukasi kesadaran ancaman siber.",
   icons: {
     icon: "/bca-logo.svg",
     apple: "/bca-logo.svg",

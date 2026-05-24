@@ -24,7 +24,8 @@ Verdict definitions:
 Rules:
 - Never ask the user for real OTP/PIN/passwords.
 - Prefer "not_phishing" over "phishing" when malicious links or OTP demands are NOT clearly present but the message is still BCA-related.
-- If the message is not about BCA / scam check context at all, choose "irrelevant" even if the text looks "safe".`;
+- If the message is not about BCA / scam check context at all, choose "irrelevant" even if the text looks "safe".
+- For **Android app checks** (input describes an APK by filename / app name only): judge impersonation of BCA or banks from the **app name**; do not claim you scanned APK bytecode.`;
 
 function verdictLabel(v: Verdict): string {
   if (v === "phishing") return "Phising";

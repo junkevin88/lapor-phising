@@ -11,7 +11,7 @@ import {
   Layers,
   Loader2,
   MessageSquareText,
-  Upload,
+  File as FileIcon,
   Shield,
   Ticket,
 } from "lucide-react";
@@ -21,9 +21,9 @@ import { extractTextFromImageClient } from "@/lib/ocr-client";
 import { nextHBCATicketId } from "@/lib/ticket";
 
 const MAX_IMAGE_FILE_BYTES = 4 * 1024 * 1024;
-const MAX_UPLOAD_FILE_BYTES = 24 * 1024 * 1024;
+const MAX_FILE_BYTES = 24 * 1024 * 1024;
 
-type Tab = "text" | "image" | "upload";
+type Tab = "text" | "image" | "file";
 
 type OcrUiState = {
   loading: boolean;
@@ -226,13 +226,13 @@ export default function ContactScamChecker() {
     await runAnalyze({ source: "text", text });
   }
 
-  async function onExtractUploadAndAnalyze() {
+  async function onExtractFileAndAnalyze() {
     if (!uploadFile) {
-      setError("Pilih file dulu untuk diunggah.");
+      setError("Pilih file dulu.");
       return;
     }
-    if (uploadFile.size > MAX_UPLOAD_FILE_BYTES) {
-      setError(`File terlalu besar (maks ${MAX_UPLOAD_FILE_BYTES / (1024 * 1024)} MB).`);
+    if (uploadFile.size > MAX_FILE_BYTES) {
+      setError(`File terlalu besar (maks ${MAX_FILE_BYTES / (1024 * 1024)} MB).`);
       return;
     }
 
@@ -250,11 +250,20 @@ export default function ContactScamChecker() {
         const j = await ex.json().catch(() => ({}));
         throw new Error(typeof j.error === "string" ? j.error : `Gagal membaca file (${ex.status}).`);
       }
-      const raw = (await ex.json()) as { text?: string };
+      const raw = (await ex.json()) as {
+        kind?: string;
+        text?: string;
+        appName?: string;
+        fileName?: string;
+      };
       const extracted = typeof raw.text === "string" ? raw.text.trim() : "";
-      setUploadExtractedText(extracted);
+      const preview =
+        raw.kind === "app" && typeof raw.appName === "string"
+          ? `Aplikasi: ${raw.appName}${raw.fileName ? ` (${raw.fileName})` : ""}`
+          : extracted;
+      setUploadExtractedText(preview);
       if (!extracted) {
-        throw new Error("Teks dari file kosong atau belum bisa dibaca. Coba file lain.");
+        throw new Error("File tidak bisa dibaca. Coba format lain.");
       }
       setResult(await executeAnalyze({ source: "text", text: extracted }));
     } catch (e) {
@@ -397,15 +406,15 @@ export default function ContactScamChecker() {
                 <button
                   type="button"
                   className={`flex items-center gap-2 rounded-full px-4 py-2 transition ${
-                    tab === "upload" ? "bg-white text-[#0a3a63] shadow-sm" : "hover:text-slate-800"
+                    tab === "file" ? "bg-white text-[#0a3a63] shadow-sm" : "hover:text-slate-800"
                   }`}
                   onClick={() => {
-                    setTab("upload");
+                    setTab("file");
                     setError(null);
                   }}
                 >
-                  <Upload className="h-4 w-4" />
-                  Upload
+                  <FileIcon className="h-4 w-4" />
+                  File
                 </button>
               </div>
             </div>
@@ -447,7 +456,7 @@ export default function ContactScamChecker() {
                 {previewUrl && (
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={previewUrl} alt="Pratinjau unggahan" className="max-h-56 w-full object-contain" />
+                    <img src={previewUrl} alt="Pratinjau file" className="max-h-56 w-full object-contain" />
                   </div>
                 )}
                 {file && (
@@ -484,15 +493,15 @@ export default function ContactScamChecker() {
               </div>
             )}
 
-            {tab === "upload" && (
+            {tab === "file" && (
               <div className="flex flex-col gap-3">
                 <label htmlFor="upl" className="text-sm font-medium text-slate-700">
-                  Upload file
+                  File
                 </label>
                 <input
                   id="upl"
                   type="file"
-                  accept=".pdf,.doc,.docx,.apk,.txt,.md,.json,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  accept=".pdf,.doc,.docx,.apk,.txt,.md,.json,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.android.package-archive,text/plain"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     setUploadFile(f ?? null);
@@ -512,17 +521,13 @@ export default function ContactScamChecker() {
                 {uploadExtractedText && (
                   <details className="rounded-xl border border-slate-200 bg-slate-50" open>
                     <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-slate-800">
-                      Preview teks dari file
+                      Pratinjau untuk analisis
                     </summary>
                     <pre className="max-h-40 overflow-auto whitespace-pre-wrap border-t border-slate-200 px-3 py-2 font-mono text-xs text-slate-800">
                       {uploadExtractedText}
                     </pre>
                   </details>
                 )}
-                <p className="text-xs text-slate-500">
-                  File akan dibaca untuk mengambil teksnya, lalu dianalisis seperti tab Teks. Beberapa format (mis.
-                  aplikasi) mungkin tidak bisa diekstrak penuh.
-                </p>
               </div>
             )}
 
@@ -531,12 +536,12 @@ export default function ContactScamChecker() {
                 type="button"
                 disabled={loading}
                 onClick={
-                  tab === "text" ? onAnalyzeText : tab === "image" ? onAnalyzeImage : onExtractUploadAndAnalyze
+                  tab === "text" ? onAnalyzeText : tab === "image" ? onAnalyzeImage : onExtractFileAndAnalyze
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0072BC] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00619e] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                {tab === "upload" ? "Baca & analisis" : "Analisis"}
+                {tab === "file" ? "Baca & analisis" : "Analisis"}
               </button>
               <span className="text-xs text-slate-500 sm:self-center">Sample cepat:</span>
               <div className="flex flex-wrap gap-2">
@@ -562,7 +567,7 @@ export default function ContactScamChecker() {
                 <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
                 {tab === "image"
                   ? "Mengirim gambar + konteks OCR ke server…"
-                  : tab === "upload"
+                  : tab === "file"
                     ? "Membaca file lalu menganalisis…"
                     : "Mengirim teks ke model & mesin skor…"}
               </p>
@@ -587,7 +592,7 @@ export default function ContactScamChecker() {
           <section className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-10 text-center text-sm text-slate-600">
             <p className="font-medium text-slate-700">Belum ada laporan</p>
             <p className="mt-2 max-w-md mx-auto">
-              Pilih tab <strong>Teks</strong>, <strong>Gambar</strong>, atau <strong>Upload</strong>, lalu jalankan analisis.
+              Pilih tab <strong>Teks</strong>, <strong>Gambar</strong>, atau <strong>File</strong>, lalu jalankan analisis.
               Kamu bisa mulai dari sample cepat di bawah tombol.
             </p>
           </section>
