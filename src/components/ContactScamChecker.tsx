@@ -169,9 +169,11 @@ export default function ContactScamChecker() {
 
   const needsEscalation = useMemo(() => {
     if (!result || ticketPayload) return false;
-    if (result.verdict === "irrelevant") return false;
+    if (result.verdict === "irrelevant" || result.verdict === "phishing") return false;
     return result.confidence < ESCALATION_CONFIDENCE_THRESHOLD;
   }, [result, ticketPayload]);
+
+  const showPhishingReportSent = Boolean(result?.verdict === "phishing");
 
   type AnalyzePayload =
     | { source: "text"; text: string }
@@ -549,23 +551,27 @@ export default function ContactScamChecker() {
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
                 {tab === "file" ? "Baca & analisis" : "Analisis"}
               </button>
-              <span className="text-xs text-slate-500 sm:self-center">Sample cepat:</span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-100"
-                  onClick={() => applySample(SAMPLE_PHISHING)}
-                >
-                  Phishing
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
-                  onClick={() => applySample(SAMPLE_NOT_PHISHING)}
-                >
-                  Bukan phishing
-                </button>
-              </div>
+              {tab === "text" && (
+                <>
+                  <span className="text-xs text-slate-500 sm:self-center">Sample cepat:</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-100"
+                      onClick={() => applySample(SAMPLE_PHISHING)}
+                    >
+                      Phishing
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+                      onClick={() => applySample(SAMPLE_NOT_PHISHING)}
+                    >
+                      Bukan phishing
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {loading && (
@@ -693,6 +699,21 @@ export default function ContactScamChecker() {
           </section>
         )}
 
+        {showPhishingReportSent && result && (
+          <section className="rounded-2xl border-2 border-sky-200 bg-sky-50/95 p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-sky-700" />
+              <div className="text-sm text-sky-950">
+                <h3 className="text-base font-semibold text-[#0a3a63]">Laporan terkirim</h3>
+                <p className="mt-2 leading-relaxed">
+                  Laporan Anda telah dikirimkan ke <strong>Halo BCA</strong> untuk ditindaklanjuti. Tim kami akan
+                  meninjau indikasi phishing yang terdeteksi.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {needsEscalation && result && (
           <section className="rounded-2xl border border-amber-200 bg-amber-50/95 p-5 shadow-sm">
             <div className="flex flex-col gap-4">
@@ -743,7 +764,7 @@ export default function ContactScamChecker() {
           </section>
         )}
 
-        {ticketPayload && (
+        {ticketPayload && result?.verdict !== "phishing" && (
           <section className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/95 p-5 shadow-md">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-700" />
